@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="Humidity_Temperature_LCD" boardCompatibility="com.silabs.board.none:0.0.0" partCompatibility="mcu.8051.efm8.bb1.efm8bb10f8g-a-soic16" toolchainCompatibility="com.silabs.ss.tool.ide.c8051.toolchain.keil.cdt:9.53.0" sdkCompatibility="com.silabs.sdk.8051:4.0.4._-963069517" propertyScope="project" contentRoot="file:/C:/Users/sxmchxn/SimplicityStudio/v4_workspace/Humidity_Temperature_LCD/">
+  <folder name="inc" uri="inc/" includeAllFiles="false" includeAllFolders="false">
+    <file name="InitDevice.h"/>
+  </folder>
+  <folder name="src" uri="src/" includeAllFiles="false" includeAllFolders="false">
+    <file name="Humidity_Temperature_LCD_main.c"/>
+    <file name="InitDevice.c"/>
+  </folder>
+  <file name="Humidity_Temperature_LCD.hwconf"/>
+  <sourceFolder></sourceFolder>
+  <sourceFolder>src</sourceFolder>
+  <property key="core.installationPath" value="file:/C:/Users/sxmchxn/SimplicityStudio/v4_workspace/Humidity_Temperature_LCD"/>
+  <property key="projectCommon.buildArtifactType" value="EXE"/>
+  <property key="projectCommon.importModeId" value="LINK_LIBRARIES"/>
+  <includePath languageCompatibility="c asm" uri="unresolved:$%7BProjDirPath%7D/inc/"/>
+  <module builtin="true" id="com.silabs.sdk.si8051.shared"/>
+  <configuration name="com.silabs.ss.tool.ide.c8051.toolchain.keil.cdt.debug#com.silabs.ss.tool.ide.c8051.toolchain.keil.cdt:9.53.0" label="Keil 8051 v9.53 - Debug" stockConfigCompatibility="com.silabs.ss.tool.ide.c8051.toolchain.keil.cdt.debug">
+    <property key="buildArtifactType" value="EXE"/>
+    <description></description>
+    <outputFileBase>${ProjName}</outputFileBase>
+    <prebuildStep></prebuildStep>
+    <postbuildStep></postbuildStep>
+    <macroDefinition languageCompatibility="c" name="DEBUG" value="1"/>
+  </configuration>
+  <configuration name="com.silabs.ss.tool.ide.c8051.toolchain.keil.cdt.release#com.silabs.ss.tool.ide.c8051.toolchain.keil.cdt:9.53.0" label="Keil 8051 v9.53 - Release" stockConfigCompatibility="com.silabs.ss.tool.ide.c8051.toolchain.keil.cdt.release">
+    <property key="buildArtifactType" value="EXE"/>
+    <description></description>
+    <outputFileBase>${ProjName}</outputFileBase>
+    <prebuildStep></prebuildStep>
+    <postbuildStep></postbuildStep>
+    <macroDefinition languageCompatibility="c" name="NDEBUG" value="1"/>
+  </configuration>
+</project>

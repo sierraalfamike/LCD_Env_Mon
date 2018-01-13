@@ -1,0 +1,8 @@
+protectFromDetectionUpdates=false
+targetPartOverride=mcu.8051.efm8.bb1.efm8bb10f8g-a-soic16
+label=USB Debug Adapter (EC600MCU123)
+boardOverrides {
+}
+EXTENSION:com.silabs.ss.support.mcu.internal.api.part.core.MCUDeviceSettingExtension {
+  tifId:c2
+}

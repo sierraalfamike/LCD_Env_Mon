@@ -1,0 +1,324 @@
+C51 COMPILER V9.53.0.0   HUMIDITY_TEMPERATURE_LCD_MAIN                                     01/11/2018 01:52:07 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE HUMIDITY_TEMPERATURE_LCD_MAIN
+OBJECT MODULE PLACED IN .\src\Humidity_Temperature_LCD_main.OBJ
+COMPILER INVOKED BY: c:\SiliconLabs\SimplicityStudio\v4\developer\toolchains\keil_8051\9.53\BIN\C51.exe C:\Users\sxmchxn
+                    -\SimplicityStudio\v4_workspace\Humidity_Temperature_LCD\src\Humidity_Temperature_LCD_main.c OMF2 SMALL DEBUG OBJECTEXTEN
+                    -D ROM(LARGE) WARNINGLEVEL(2) FLOATFUZZY(3) OPTIMIZE(8,SPEED) DEFINE(DEBUG=1) INTVECTOR(0X0000) INTPROMOTE INCDIR(C:/User
+                    -s/sxmchxn/SimplicityStudio/v4_workspace/Humidity_Temperature_LCD/inc;C:/SiliconLabs/SimplicityStudio/v4/developer/sdks/8
+                    -051/v4.0.4//Device/shared/si8051base;C:/SiliconLabs/SimplicityStudio/v4/developer/sdks/8051/v4.0.4//Device/EFM8BB1/inc) 
+                    -PRINT(.\src\Humidity_Temperature_LCD_main.lst) COND PAGEWIDTH(120) PAGELENGTH(65) OBJECT(.\src\Humidity_Temperature_LCD_
+                    -main.OBJ)
+
+line level    source
+
+   1          
+   2          //-----------------------------------------------------------------------------
+   3          // Includes
+   4          //-----------------------------------------------------------------------------
+   5          #include <SI_EFM8BB1_Register_Enums.h>                  // SFR declarations
+   6          #include "InitDevice.h"
+   7          #include <stdio.h>
+   8          // $[Generated Includes]
+   9          // [Generated Includes]$
+  10          
+  11                  /*
+  12                   * Breadboard wiring notes:
+  13                   *
+  14                   * RS wired to P1.0
+  15                   * RW wired to ground
+  16                   * E wired to P1.1
+  17                   * D0-7 wired to P0.0-7
+  18                   *
+  19                   * DHT11 IO wired to P1.3
+  20                   *
+  21                   */
+  22          #define lcd_rs P1_B0
+  23          #define lcd_e P1_B1
+  24          #define lcd_data P0
+  25          
+  26          #define DHT11_PIN P1_B3
+  27          
+  28          uint8_t line0[17] = {0};
+  29          char line1[17] = {0};
+  30          
+  31          int16_t temperature = 0;
+  32          int16_t humidity = 0;
+  33          
+  34          
+  35          bit dht11_io_expected_status = 0;
+  36          uint16_t dht11_io_expected_status_expected_duration_us = 0;
+  37          uint16_t dht11_io_status_current_duration = 0;
+  38          
+  39          uint8_t dht11_response_mask = 1;
+  40          int8_t dht11_response_bit = 0;
+  41          
+  42          typedef struct dht11_data {
+  43                  uint8_t humidity_integer;
+  44                  uint8_t humidity_decimal;
+  45                  uint8_t temperature_integer;
+  46                  uint8_t temperature_fractional;
+  47                  uint8_t checksum;
+  48          } dht11_data_t;
+  49          
+  50          dht11_data_t dht11_readout;
+C51 COMPILER V9.53.0.0   HUMIDITY_TEMPERATURE_LCD_MAIN                                     01/11/2018 01:52:07 PAGE 2   
+
+  51          uint8_t*  dht11_readout_ptr;
+  52          
+  53          
+  54          uint8_t humidity_integer = 0;
+  55          uint8_t humidity_decimal = 0;
+  56          uint8_t temperature_integer = 0;
+  57          uint8_t temperature_fractional = 0;
+  58          uint8_t checksum = 0;
+  59          
+  60          
+  61          
+  62          void delay_us (uint16_t i)
+  63          {
+  64   1              // microsecond increments based on 12 MHz sysclk and timer0
+  65   1              // timer0 prescaled to sysclock/12
+  66   1              // timer0 is in 16 bit mode
+  67   1              TH0 = 0;
+  68   1              TL0 = 0;
+  69   1              while( ((TH0 << 8) | TL0) < i );
+  70   1      }
+  71          
+  72          void delay_ms (uint16_t i)
+  73          {
+  74   1              // for every one millisecond, call delay_us() 1000 times
+  75   1              while ( i > 0 )
+  76   1              {
+  77   2                      delay_us(1000);
+  78   2                      i--;
+  79   2              }
+  80   1      }
+  81          
+  82          void delay_seconds (uint16_t i)
+  83          {
+  84   1              // for every one second, call delay_ms() 1000 times
+  85   1              while ( i > 0 )
+  86   1              {
+  87   2                      delay_ms(1000);
+  88   2                      i--;
+  89   2              }
+  90   1      }
+  91          
+  92          void lcd_e_pulse ()
+  93          {
+  94   1              // the 12 MHz sysclk period is 81 nanoseconds
+  95   1              // SETB P1.1 takes two cycles
+  96   1              // each NOP takes one cycle
+  97   1              // CLR P1.1 takes two cycles
+  98   1              // the lcd_e latch stays high for ~500 nanoseconds
+  99   1              lcd_e = 1;
+ 100   1              _nop_();
+ 101   1              _nop_();
+ 102   1              _nop_();
+ 103   1              _nop_();
+ 104   1              lcd_e = 0;
+ 105   1              delay_us(50);
+ 106   1      }
+ 107          
+ 108          void lcd_initialize()
+ 109          {
+ 110   1              // wait for HD44780 LCD to be ready
+ 111   1              delay_us(50000);
+ 112   1      
+ 113   1              // select the instruction register to send commands
+C51 COMPILER V9.53.0.0   HUMIDITY_TEMPERATURE_LCD_MAIN                                     01/11/2018 01:52:07 PAGE 3   
+
+ 114   1              // pull down the enable pin
+ 115   1              lcd_rs = 0;
+ 116   1              lcd_e = 0;
+ 117   1      
+ 118   1              // set function for left-to-right entry mode, disable screen shifting
+ 119   1              lcd_data = 0x06;
+ 120   1              lcd_e_pulse();
+ 121   1      
+ 122   1              // set function for 8 bit, two line mode
+ 123   1              lcd_data = 0x38;
+ 124   1              lcd_e_pulse();
+ 125   1      
+ 126   1              // turn on display with blinking cursor
+ 127   1              lcd_data = 0x0f;
+ 128   1              lcd_e_pulse();
+ 129   1      
+ 130   1              // clear display and return cursor to home, this needs some extra delay
+ 131   1              lcd_rs = 0;
+ 132   1              lcd_data = 0x01;
+ 133   1              lcd_e_pulse();
+ 134   1              delay_us(2000);
+ 135   1      }
+ 136          
+ 137          void print_to_lcd()
+ 138          {
+ 139   1              char* current_character;
+ 140   1              sprintf(line0, "temperture: %d\xDF\C", temperature);
+ 141   1              sprintf(line1, "humidity: %d%%", humidity);
+ 142   1      
+ 143   1              // clear display
+ 144   1              lcd_rs = 0;
+ 145   1              lcd_data = 0x01;
+ 146   1              lcd_e_pulse();
+ 147   1              delay_us(2000);
+ 148   1      
+ 149   1              // change to data register
+ 150   1              lcd_rs = 1;
+ 151   1      
+ 152   1              // pause for effect
+ 153   1              delay_ms(500);
+ 154   1              // write out line0
+ 155   1              current_character = line0;
+ 156   1              do {
+ 157   2                      lcd_data = *current_character;
+ 158   2                      lcd_e_pulse();
+ 159   2              } while(*((current_character++)+1) != 0);
+ 160   1      
+ 161   1              // move cursor to second line
+ 162   1              lcd_rs = 0;
+ 163   1              lcd_data = 0xc0;
+ 164   1              lcd_e_pulse();
+ 165   1      
+ 166   1              // change to data register
+ 167   1              lcd_rs = 1;
+ 168   1      
+ 169   1              // pause for effect
+ 170   1              delay_ms(500);
+ 171   1              // write out line1
+ 172   1              current_character = line1;
+ 173   1              do {
+ 174   2                      lcd_data = *current_character;
+ 175   2                      lcd_e_pulse();
+ 176   2              } while(*((current_character++)+1) != 0);
+C51 COMPILER V9.53.0.0   HUMIDITY_TEMPERATURE_LCD_MAIN                                     01/11/2018 01:52:07 PAGE 4   
+
+ 177   1      }
+ 178          
+ 179          void dht11_initialize()
+ 180          {
+ 181   1              DHT11_PIN = 0;
+ 182   1              delay_us(20000);
+ 183   1              DHT11_PIN = 1;
+ 184   1      }
+ 185          
+ 186          void dht11_read_data()
+ 187          {
+ 188   1              // wait til DHT11 responds with ready signal
+ 189   1      //      dht11_io_expected_status = 0;
+ 190   1      //      dht11_io_expected_status_expected_duration_us = 80;
+ 191   1      //      dht11_io_status_current_duration = 0;
+ 192   1      //      while ( DHT11_PIN == dht11_io_expected_status && dht11_io_status_current_duration < dht11_io_expected_s
+             -tatus_expected_duration_us)
+ 193   1      //      {
+ 194   1      //              dht11_io_status_current_duration++;
+ 195   1      //      }
+ 196   1      //      dht11_io_expected_status = 1;
+ 197   1      //      dht11_io_expected_status_expected_duration_us = 80;
+ 198   1      //      dht11_io_status_current_duration = 0;
+ 199   1      //      while ( DHT11_PIN == dht11_io_expected_status && dht11_io_status_current_duration < dht11_io_expected_s
+             -tatus_expected_duration_us)
+ 200   1      //      {
+ 201   1      //              dht11_io_status_current_duration++;
+ 202   1      //      }
+ 203   1              delay_us(200);
+ 204   1              // read all the high pulses and assign value by duration
+ 205   1              dht11_io_expected_status = 1;
+ 206   1              dht11_io_expected_status_expected_duration_us = 50;
+ 207   1              dht11_io_status_current_duration = 0;
+ 208   1              dht11_response_bit = 0;
+ 209   1              humidity_integer = 0;
+ 210   1              dht11_response_mask = 1;
+ 211   1              dht11_readout_ptr = (uint8_t*)&dht11_readout;
+ 212   1      
+ 213   1              {
+ 214   2                      uint8_t i = 0;
+ 215   2              for ( i = 0; i < 5; i++ )
+ 216   2              {
+ 217   3                      humidity_integer = 0;
+ 218   3                      for ( dht11_response_bit = 7; dht11_response_bit >= 0; dht11_response_bit-- )
+ 219   3                      {
+ 220   4                              P0_B1 = 1;
+ 221   4                              P0_B1 = 0;
+ 222   4                              // wait for the dht11_io pin to go high
+ 223   4                              while ( DHT11_PIN != dht11_io_expected_status );
+ 224   4                              // count time to see if the pin is high for a short or long period of time
+ 225   4                              delay_us(50);
+ 226   4                              P0_B2 = 1;
+ 227   4                              P0_B2 = 0;
+ 228   4      
+ 229   4                              dht11_response_mask <<= 1;
+ 230   4                              if ( DHT11_PIN )
+ 231   4                              {
+ 232   5                                      P0_B3 = 1;
+ 233   5                                      humidity_integer |=  ( 1 << dht11_response_bit );
+ 234   5                                      delay_us(40);
+ 235   5                                      P0_B3 = 0;
+ 236   5                              }
+ 237   4                      }
+C51 COMPILER V9.53.0.0   HUMIDITY_TEMPERATURE_LCD_MAIN                                     01/11/2018 01:52:07 PAGE 5   
+
+ 238   3                      dht11_readout_ptr[i] = humidity_integer;
+ 239   3              }
+ 240   2              }
+ 241   1              humidity = dht11_readout.humidity_integer;
+ 242   1              temperature = dht11_readout.temperature_integer;
+ 243   1      }
+ 244          
+ 245          //-----------------------------------------------------------------------------
+ 246          // main() Routine
+ 247          // ----------------------------------------------------------------------------
+ 248          int main (void)
+ 249          {
+ 250   1      
+ 251   1              // Call hardware initialization routine
+ 252   1              enter_DefaultMode_from_RESET();
+ 253   1      
+ 254   1              // set the LCD to sane settings
+ 255   1              lcd_initialize();
+ 256   1              // print some useless initial text
+ 257   1              print_to_lcd();
+ 258   1      
+ 259   1              // dht11 needs one second to be ready for the start signal
+ 260   1              // luckily, all the initial LCD stuff takes a bit over one second
+ 261   1              // otherwise, uncomment the next line for a two second delay
+ 262   1              // delay_seconds(2);
+ 263   1              dht11_initialize();
+ 264   1              // get some initial data asap
+ 265   1              dht11_read_data();
+ 266   1              // show initial data on the LCD
+ 267   1              print_to_lcd();
+ 268   1      
+ 269   1              while (1) 
+ 270   1         {
+ 271   2                      // update LCD with new data every 10 seconds, forever
+ 272   2                      delay_seconds(10);
+ 273   2                      dht11_initialize();
+ 274   2                      dht11_read_data();
+ 275   2                      print_to_lcd();
+ 276   2           // $[Generated Run-time code]
+ 277   2           // [Generated Run-time code]$
+ 278   2         }                             
+ 279   1      }
+ 280          
+ 281          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    512    ----
+   CONSTANT SIZE    =     32    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     57       6
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
