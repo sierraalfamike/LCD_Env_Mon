@@ -1,0 +1,216 @@
+
+//-----------------------------------------------------------------------------
+// Includes
+//-----------------------------------------------------------------------------
+#include <SI_EFM8BB1_Register_Enums.h>                  // SFR declarations
+#include "InitDevice.h"
+#include <stdio.h>
+// $[Generated Includes]
+// [Generated Includes]$
+
+	/*
+	 * Breadboard wiring notes:
+	 *
+	 * RS wired to P1.0
+	 * RW wired to ground
+	 * E wired to P1.1
+	 * D0-7 wired to P0.0-7
+	 *
+	 * DHT11 IO wired to P1.3
+	 *
+	 */
+#define lcd_rs P1_B0
+#define lcd_e P1_B1
+#define lcd_data P0
+
+#define dht11_io P1_B3
+
+uint8_t line0[17] = {0};
+char line1[17] = {0};
+
+int16_t temperature = 0;
+int16_t humidity = 0;
+
+
+bit dht11_response = 0;
+uint8_t dht11_response_count = 0;
+
+uint8_t dht11_response_mask = 1;
+uint8_t temperature_integer = 0;
+uint8_t temperature_decimal = 0;
+uint8_t humidity_integer = 0;
+uint8_t humidity_decimal = 0;
+uint8_t checksum = 0;
+
+void delay_us (uint16_t i)
+{
+	// microsecond increments based on 12 MHz sysclk and timer0
+	// timer0 prescaled to sysclock/12
+	// timer0 is in 16 bit mode
+	TH0 = 0;
+	TL0 = 0;
+	while( ((TH0 << 8) | TL0) < i );
+}
+
+void lcd_e_pulse ()
+{
+	// the 12 MHz sysclk period is 81 nanoseconds
+	// SETB P1.1 takes two cycles
+	// each NOP takes one cycle
+	// CLR P1.1 takes two cycles
+	// the lcd_e latch stays high for ~500 nanoseconds
+	lcd_e = 1;
+	_nop_();
+	_nop_();
+	_nop_();
+	_nop_();
+	lcd_e = 0;
+	delay_us(50);
+}
+
+void lcd_initialize()
+{
+	// wait for HD44780 LCD to be ready
+	delay_us(50000);
+
+	// select the instruction register to send commands
+	// pull down the enable pin
+	lcd_rs = 0;
+	lcd_e = 0;
+
+	// set function for left-to-right entry mode, disable screen shifting
+	lcd_data = 0x06;
+	lcd_e_pulse();
+
+	// set function for 8 bit, two line mode
+	lcd_data = 0x38;
+	lcd_e_pulse();
+
+	// turn on display with blinking cursor
+	lcd_data = 0x0f;
+	lcd_e_pulse();
+
+	// clear display and return cursor to home, this needs some extra delay
+	lcd_rs = 0;
+	lcd_data = 0x01;
+	lcd_e_pulse();
+	delay_us(2000);
+}
+
+void print_to_lcd()
+{
+	char* current_character;
+	sprintf(line0, "temp: %01d\xDF\F", temperature);
+	sprintf(line1, "humidity: %d%%", humidity);
+
+	// clear display
+	lcd_rs = 0;
+	lcd_data = 0x01;
+	lcd_e_pulse();
+	delay_us(2000);
+
+	// change to data register
+	lcd_rs = 1;
+
+	// pause for effect
+	delay_us(65000);
+	delay_us(65000);
+	delay_us(65000);
+	delay_us(65000);
+	delay_us(65000);
+	delay_us(65000);
+	delay_us(65000);
+	// write out line0
+	current_character = line0;
+	do {
+		lcd_data = *current_character;
+		lcd_e_pulse();
+	} while(*((current_character++)+1) != 0);
+
+	// move cursor to second line
+	lcd_rs = 0;
+	lcd_data = 0xc0;
+	lcd_e_pulse();
+
+	// change to data register
+	lcd_rs = 1;
+
+	// pause for effect
+	delay_us(65000);
+	delay_us(65000);
+	delay_us(65000);
+	delay_us(65000);
+	delay_us(65000);
+	delay_us(65000);
+	delay_us(65000);
+	// write out line1
+	current_character = line1;
+	do {
+		lcd_data = *current_character;
+		lcd_e_pulse();
+	} while(*((current_character++)+1) != 0);
+}
+
+void dht11_read()
+{
+	dht11_io = 0;
+	delay_us(20000);
+	dht11_io = 1;
+	delay_us(15);
+
+	// check if DHT11 responds with 80 microseconds of low, then high
+
+	for ( dht11_response_count = 0; dht11_response_count < 2; )
+	{
+		if ( dht11_response == dht11_io )
+		{
+			dht11_response = !dht11_response;
+			dht11_response_count++;
+		}
+		else
+		{
+			dht11_response_count = 0;
+		}
+		delay_us(80);
+	}
+
+	dht11_response = 0;
+
+	// check for 50 microseconds of low for spacing
+	delay_us(50);
+	delay_us(25);
+
+	// check for 27 microseconds of high for a '0' bit
+	// check for 72 microseconds of high for a '1' bit
+}
+
+void dht11_initialize()
+{
+	dht11_io = 0;
+	delay_us(20000);
+	dht11_io = 1;
+}
+//-----------------------------------------------------------------------------
+// main() Routine
+// ----------------------------------------------------------------------------
+int main (void)
+{
+
+	// Call hardware initialization routine
+	enter_DefaultMode_from_RESET();
+
+	lcd_initialize();
+
+	print_to_lcd();
+
+	dht11_initialize();
+
+	while (1) 
+   {
+
+     // $[Generated Run-time code]
+     // [Generated Run-time code]$
+   }                             
+}
+
+
